@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Holló eseménytér</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Layout: city switcher on top, giant city name as the one loud element,
+   calendar + list side by side, status colour carried by a left stripe everywhere. */
+:root {
+  --paper: #eff1ee;
+  --surface: #ffffff;
+  --ink: #15181d;
+  --muted: #5d646e;
+  --line: #d9ddd8;
+  --accent: #1d4c5c;
+  --accent-ink: #ffffff;
+  --s1: #8a919b;
+  --s2: #d9971a;
+  --s3: #3a7fd4;
+  --s4: #9459db;
+  --s5: #23a066;
+  --danger: #c4402f;
+  --font-display: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --radius: 10px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1114; --surface: #161a1f; --ink: #e7eaed; --muted: #9aa3ad;
+    --line: #2a3038; --accent: #74b6ca; --accent-ink: #0b1418;
+    --s1: #8f97a1; --s2: #e7a933; --s3: #5d9ae6; --s4: #ad7bec; --s5: #3dbb7f; --danger: #e46655;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1114; --surface: #161a1f; --ink: #e7eaed; --muted: #9aa3ad;
+  --line: #2a3038; --accent: #74b6ca; --accent-ink: #0b1418;
+  --s1: #8f97a1; --s2: #e7a933; --s3: #5d9ae6; --s4: #ad7bec; --s5: #3dbb7f; --danger: #e46655;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--paper); color: var(--ink);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.05; }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--font-mono); font-size: 12.5px; letter-spacing: .02em; }
+.muted { color: var(--muted); }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 0 max(16px, 3vw); }
+
+/* status helpers */
+.st-1 { --st: var(--s1); } .st-2 { --st: var(--s2); } .st-3 { --st: var(--s3); }
+.st-4 { --st: var(--s4); } .st-5 { --st: var(--s5); }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  padding: 2px 9px 2px 7px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+  background: color-mix(in srgb, var(--st) 15%, transparent);
+  color: color-mix(in srgb, var(--st) 70%, var(--ink));
+}
+.pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--st); }
+.steps-mini { display: inline-flex; gap: 3px; }
+.steps-mini i { width: 14px; height: 4px; border-radius: 2px; background: var(--line); }
+.steps-mini i.on { background: var(--st); }
+
+/* top bar */
+.top { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; align-items: center; gap: 20px; min-height: 60px; flex-wrap: wrap; padding-top: 8px; padding-bottom: 8px; }
+.brand { display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 0; }
+.brand svg { width: 30px; height: 30px; color: var(--ink); }
+.brand b { font-family: var(--font-display); font-weight: 800; font-size: 21px; letter-spacing: -.02em; }
+.brand span { color: var(--muted); font-size: 13px; }
+.nav { display: flex; gap: 4px; flex-wrap: wrap; margin-left: auto; }
+.nav button {
+  border: 0; background: none; padding: 7px 12px; border-radius: 8px;
+  font-weight: 600; color: var(--muted);
+}
+.nav button:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.nav button[aria-current="page"] { color: var(--accent-ink); background: var(--accent); }
+.nav .sep { width: 1px; background: var(--line); margin: 6px 6px; }
+
+/* buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  padding: 8px 14px; border-radius: 8px; font-weight: 600; font-size: 14px; white-space: nowrap;
+}
+.btn:hover { border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.ok { background: var(--s5); border-color: var(--s5); color: #fff; }
+.btn.danger { color: var(--danger); }
+.btn.danger.solid { background: var(--danger); color: #fff; border-color: var(--danger); }
+.btn.small { padding: 5px 10px; font-size: 13px; }
+.btn.ghost { background: none; border-color: transparent; }
+.btn:disabled { opacity: .55; cursor: progress; }
+.btn svg { width: 16px; height: 16px; }
+
+/* hero */
+.hero { padding: 34px 0 22px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 18px 32px; }
+.hero h1 { font-size: clamp(54px, 10vw, 128px); font-weight: 800; letter-spacing: -.045em; line-height: .86; }
+.hero .meta { display: grid; gap: 10px; padding-bottom: 6px; }
+.hero .meta p { margin: 0; color: var(--muted); }
+.hero .actions { margin-left: auto; display: flex; gap: 8px; padding-bottom: 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 999px;
+  padding: 4px 10px 4px 8px; font-size: 13px; font-weight: 600; display: inline-flex; gap: 6px; align-items: center;
+}
+.chip .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--st, var(--muted)); }
+.chip[aria-pressed="true"] { border-color: var(--st, var(--ink)); background: color-mix(in srgb, var(--st, var(--ink)) 12%, var(--surface)); }
+.chip b { font-variant-numeric: tabular-nums; }
+
+/* city layout */
+.city-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(330px, 1fr); gap: 20px; padding-bottom: 60px; align-items: start; }
+@media (max-width: 1000px) { .city-grid { grid-template-columns: 1fr; } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.panel-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.panel-head h2 { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+.panel-head .grow { flex: 1; }
+
+/* calendar */
+.cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.cal .dow { padding: 8px 8px 6px; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--line); }
+.day {
+  position: relative; min-height: 104px; padding: 6px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+}
+.cal > .day:nth-child(7n) { border-right: 0; }
+.day.out { background: color-mix(in srgb, var(--paper) 55%, var(--surface)); }
+.day.out .dnum { color: color-mix(in srgb, var(--muted) 60%, transparent); }
+.dnum {
+  border: 0; background: none; padding: 1px 6px; align-self: flex-start; border-radius: 6px;
+  font-family: var(--font-display); font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums;
+}
+.dnum:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.day.today .dnum { background: var(--ink); color: var(--paper); }
+.day.sel { box-shadow: inset 0 0 0 2px var(--accent); }
+.day .add {
+  position: absolute; top: 5px; right: 5px; width: 24px; height: 24px; border-radius: 6px; border: 0;
+  background: none; color: var(--muted); font-size: 18px; line-height: 1; opacity: 0; transition: opacity .12s;
+}
+.day:hover .add, .day .add:focus-visible { opacity: 1; }
+.day .add:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--ink); }
+.ev-chip {
+  display: block; width: 100%; text-align: left; border: 0; border-left: 3px solid var(--st);
+  background: color-mix(in srgb, var(--st) 13%, var(--surface)); color: var(--ink);
+  padding: 2px 6px; border-radius: 4px; font-size: 12.5px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ev-chip:hover { background: color-mix(in srgb, var(--st) 24%, var(--surface)); }
+.ev-chip .t { font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--muted); margin-right: 4px; }
+.more { font-size: 12px; color: var(--muted); border: 0; background: none; text-align: left; padding: 0 4px; }
+@media (max-width: 620px) {
+  .day { min-height: 62px; padding: 4px 3px; }
+  .ev-chip { font-size: 0; height: 6px; padding: 0; border-left: 0; background: var(--st); }
+  .ev-chip .t { display: none; }
+  .day .add { display: none; }
+  .dnum { font-size: 13px; padding: 0 4px; }
+}
+
+/* list */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: none; padding: 5px 11px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.list { display: flex; flex-direction: column; }
+.row {
+  display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 12px; align-items: start;
+  padding: 12px 16px 12px 13px; border: 0; border-left: 4px solid var(--st); border-bottom: 1px solid var(--line);
+  background: none; text-align: left; width: 100%;
+}
+.row:last-child { border-bottom: 0; }
+.row:hover { background: color-mix(in srgb, var(--st) 7%, var(--surface)); }
+.datebox { text-align: center; line-height: 1; padding-top: 2px; }
+.datebox b { display: block; font-family: var(--font-display); font-size: 26px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.datebox span { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; }
+.row h3 { font-size: 17px; font-weight: 700; letter-spacing: -.01em; margin-bottom: 3px; overflow-wrap: anywhere; }
+.row .sub { color: var(--muted); font-size: 13.5px; display: flex; flex-wrap: wrap; gap: 2px 12px; }
+.row .foot { display: flex; align-items: center; gap: 10px; margin-top: 7px; flex-wrap: wrap; }
+.filterbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+.empty { padding: 34px 20px; text-align: center; color: var(--muted); }
+.empty b { display: block; color: var(--ink); font-family: var(--font-display); font-size: 19px; margin-bottom: 4px; }
+.dayfilter { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); border-bottom: 1px solid var(--line); font-size: 13.5px; font-weight: 600; }
+
+/* landing */
+.land { padding: 40px 0 70px; }
+.land h1 { font-size: clamp(44px, 7vw, 92px); font-weight: 800; letter-spacing: -.045em; line-height: .9; }
+.land .lede { color: var(--muted); max-width: 60ch; margin: 14px 0 28px; font-size: 16px; }
+.cities { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.city-card {
+  text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 14px;
+  padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 12px; min-height: 196px;
+  transition: transform .15s ease, border-color .15s;
+}
+.city-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
+.city-card h2 { font-size: 38px; font-weight: 800; letter-spacing: -.04em; }
+.city-card .count { color: var(--muted); font-size: 13.5px; }
+.stack { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--line); }
+.stack i { display: block; height: 100%; background: var(--st); }
+.city-card .next { margin-top: auto; font-size: 13.5px; border-top: 1px dashed var(--line); padding-top: 10px; }
+.city-card .next b { display: block; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.city-card.arch { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.city-card.arch .count, .city-card.arch .next { color: color-mix(in srgb, var(--paper) 70%, transparent); border-color: color-mix(in srgb, var(--paper) 25%, transparent); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 26px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend span::before { content: ""; width: 10px; height: 10px; border-radius: 3px; background: var(--st); }
+.legend em { font-style: normal; font-family: var(--font-mono); font-size: 11.5px; }
+
+/* archive */
+.arch-grid { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 20px; padding-bottom: 60px; align-items: start; }
+@media (max-width: 900px) { .arch-grid { grid-template-columns: 1fr; } }
+.sync { padding: 18px; display: grid; gap: 14px; }
+.sync h2 { font-size: 22px; letter-spacing: -.02em; }
+.sync ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
+.sync .state { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 4px; font-size: 14px; }
+.sync .state b.big { font-family: var(--font-display); font-size: 28px; line-height: 1; }
+.sync .btns { display: grid; gap: 8px; }
+.sync .tree { font-family: var(--font-mono); font-size: 12px; line-height: 1.6; color: var(--muted); background: color-mix(in srgb, var(--paper) 60%, var(--surface)); border-radius: 8px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.arch-search { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; align-items: center; }
+.arch-search input { flex: 1; min-width: 180px; }
+.arch-city { border-bottom: 1px solid var(--line); }
+.arch-city:last-child { border-bottom: 0; }
+.arch-city > h3 { font-size: 26px; font-weight: 800; letter-spacing: -.03em; padding: 16px 16px 6px; display: flex; align-items: baseline; gap: 10px; }
+.arch-city > h3 small { font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+.arch-month { padding: 4px 16px 10px; }
+.arch-month h4 { margin: 8px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.arch-row { display: grid; grid-template-columns: 80px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 7px 0 7px 10px; border-left: 3px solid var(--st); margin-bottom: 4px; }
+.arch-row .tt { background: none; border: 0; padding: 0; text-align: left; font-weight: 700; overflow-wrap: anywhere; }
+.arch-row .tt:hover { text-decoration: underline; }
+.arch-row .who { color: var(--muted); font-size: 13px; font-weight: 400; }
+.arch-row .files { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 620px) { .arch-row { grid-template-columns: 1fr; } .arch-row .files { justify-content: flex-start; } }
+
+/* forms */
+label.f { display: grid; gap: 5px; font-size: 13px; font-weight: 600; color: var(--muted); }
+input[type="text"], input[type="date"], input[type="time"], input[type="search"], select, textarea {
+  width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 9px 11px; font-size: 15px; color: var(--ink);
+}
+textarea { min-height: 84px; resize: vertical; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-grid .full { grid-column: 1 / -1; }
+@media (max-width: 520px) { .form-grid { grid-template-columns: 1fr; } }
+
+/* modal */
+.scrim { position: fixed; inset: 0; z-index: 50; background: rgba(8, 10, 12, .5); display: flex; align-items: flex-start; justify-content: center; padding: 4vh 12px; overflow-y: auto; }
+.modal { width: min(760px, 100%); background: var(--surface); border-radius: 16px; border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(0,0,0,.28); overflow: hidden; }
+.modal.narrow { width: min(560px, 100%); }
+.modal.wide { width: min(1000px, 100%); }
+.m-stripe { height: 8px; background: var(--st, var(--accent)); }
+.m-head { padding: 18px 22px 10px; display: flex; gap: 12px; align-items: flex-start; }
+.m-head h2 { font-size: 30px; font-weight: 800; letter-spacing: -.03em; flex: 1; overflow-wrap: anywhere; }
+.m-body { padding: 4px 22px 22px; display: grid; gap: 18px; }
+.m-foot { padding: 14px 22px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.x { border: 0; background: none; font-size: 26px; line-height: 1; padding: 2px 8px; color: var(--muted); border-radius: 8px; }
+.x:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 22px; color: var(--muted); font-size: 14px; }
+.facts b { color: var(--ink); font-weight: 600; }
+.desc { white-space: pre-wrap; margin: 0; max-width: 65ch; }
+
+.stepper { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; position: relative; }
+.step { display: grid; justify-items: center; gap: 6px; text-align: center; font-size: 12px; font-weight: 600; color: var(--muted); position: relative; padding: 0 2px; }
+.step::before { content: ""; position: absolute; top: 13px; left: -50%; right: 50%; height: 3px; background: var(--line); z-index: 0; }
+.step:first-child::before { display: none; }
+.step.done::before, .step.cur::before { background: var(--st); }
+.step .n { position: relative; z-index: 1; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 3px solid var(--line); font-family: var(--font-display); font-weight: 800; font-size: 13px; color: var(--muted); }
+.step.done .n { background: var(--st); border-color: var(--st); color: #fff; }
+.step.cur .n { border-color: var(--st); color: var(--ink); box-shadow: 0 0 0 4px color-mix(in srgb, var(--st) 25%, transparent); background: var(--st); color: #fff; }
+.step.cur { color: var(--ink); }
+@media (max-width: 520px) { .step span { font-size: 10.5px; } }
+
+.action { border: 1px solid color-mix(in srgb, var(--st) 45%, var(--line)); background: color-mix(in srgb, var(--st) 7%, var(--surface)); border-radius: 12px; padding: 16px; display: grid; gap: 12px; }
+.action h3 { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+.action p { margin: 0; color: var(--muted); font-size: 14px; }
+.action .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.drop {
+  border: 2px dashed color-mix(in srgb, var(--st) 55%, var(--line)); border-radius: 10px; padding: 18px; text-align: center;
+  display: grid; gap: 6px; justify-items: center; background: var(--surface); transition: background .12s;
+}
+.drop.over { background: color-mix(in srgb, var(--st) 14%, var(--surface)); }
+.drop small { color: var(--muted); }
+.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.file {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); flex-wrap: wrap;
+}
+.file .ic { width: 38px; height: 44px; border-radius: 6px; display: grid; place-items: center; font-family: var(--font-mono); font-size: 10.5px; font-weight: 500; background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--ink); text-transform: uppercase; flex: none; }
+.file .nm { flex: 1; min-width: 150px; overflow-wrap: anywhere; }
+.file .nm b { display: block; font-weight: 600; font-size: 14px; }
+.file .nm small { color: var(--muted); }
+.file.old { opacity: .72; }
+.docs { display: grid; gap: 14px; }
+.docs h4, .hist h4 { margin: 0 0 8px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.docs .group { display: grid; gap: 6px; }
+.hist ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.hist li { display: grid; grid-template-columns: 12px 1fr; gap: 10px; font-size: 13.5px; padding-bottom: 10px; position: relative; }
+.hist li::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--st, var(--muted)); margin-top: 5px; }
+.hist li::after { content: ""; position: absolute; left: 4px; top: 17px; bottom: 0; width: 2px; background: var(--line); }
+.hist li:last-child::after { display: none; }
+.hist .when { color: var(--muted); font-size: 12.5px; }
+.note { border-left: 3px solid var(--line); padding: 2px 0 2px 10px; margin-top: 3px; color: var(--ink); white-space: pre-wrap; }
+.banner { padding: 10px 14px; border-radius: 10px; background: color-mix(in srgb, var(--s2) 14%, var(--surface)); border: 1px solid color-mix(in srgb, var(--s2) 40%, var(--line)); font-size: 14px; }
+.banner.err { background: color-mix(in srgb, var(--danger) 10%, var(--surface)); border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); }
+.preview-frame { width: 100%; height: 72vh; border: 0; background: var(--paper); display: block; }
+.preview-img { max-width: 100%; display: block; margin: 0 auto; }
+.ready { display: flex; gap: 14px; align-items: center; }
+.ready .big { width: 46px; height: 46px; border-radius: 50%; background: var(--s5); color: #fff; display: grid; place-items: center; flex: none; }
+.ready .big svg { width: 24px; height: 24px; }
+.inline-confirm { display: grid; gap: 8px; }
+
+/* toast */
+#toasts { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 80; display: grid; gap: 8px; width: min(440px, calc(100% - 24px)); }
+.toast { background: var(--ink); color: var(--paper); padding: 11px 16px; border-radius: 10px; font-size: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+.toast.err { background: var(--danger); color: #fff; }
+.progress { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+
+/* netlify version additions */
+.userchip { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.userchip b { color: var(--ink); font-weight: 600; }
+.gate { min-height: calc(100vh - 80px); display: grid; place-items: center; padding: 30px 0; }
+.gate .card { width: min(440px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 26px; display: grid; gap: 14px; }
+.gate h1 { font-size: 40px; font-weight: 800; letter-spacing: -.04em; }
+.gate p { margin: 0; color: var(--muted); }
+.tag-missing { font-size: 12px; font-weight: 700; color: var(--danger); }
+.revert { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 14px; }
+.revert select { width: auto; }
+.okline { display: flex; gap: 8px; align-items: center; color: var(--s5); font-weight: 700; }
+.okline::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--s5); }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <button class="brand" data-act="route" data-to="" aria-label="Kezdőlap">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path fill="currentColor" d="M4 22.5 11.5 11c1.6-2.5 4-4 7-4 2.4 0 4.3 1 5.6 2.6L30 10.2l-4.6 2.4c.2.6.3 1.2.3 1.9 0 4.9-3.9 8.9-9 9.6L13 28.5l.6-4.2-4.2 2.9.8-4.1Z"/><circle cx="20.6" cy="11.2" r="1.25" fill="var(--paper)"/></svg>
+      <b>holló</b><span>eseménytér</span>
+    </button>
+    <nav class="nav" id="nav" aria-label="Városok"></nav>
+    <div class="userchip" id="userchip"></div>
+  </div>
+</header>
+<main id="main"></main>
+<div id="modal-root"></div>
+<div id="form-root"></div>
+<div id="toasts" aria-live="polite"></div>
+
+<script>
+"use strict";
+/* ---------- constants ---------- */
+const CITIES = [
+  { id: "budapest", name: "Budapest" }, { id: "miskolc", name: "Miskolc" }, { id: "szeged", name: "Szeged" },
+  { id: "pecs", name: "Pécs" }, { id: "debrecen", name: "Debrecen" },
+];
+const CITY = Object.fromEntries(CITIES.map(c => [c.id, c]));
+const STATUS = { 1: "Előkészületben", 2: "One-pager leadva", 3: "One-pager elfogadva", 4: "Kommunikációs terv leadva", 5: "Eseményre kész" };
+const STEP_SHORT = { 1: "Előkészület", 2: "One-pager leadva", 3: "One-pager elfogadva", 4: "Komm. terv leadva", 5: "Eseményre kész" };
+const KIND = { onepager: { label: "One-pager" }, komm: { label: "Kommunikációs terv" } };
+const MAX_FILE = 250 * 1024 * 1024;
+const CHUNK = 320 * 1024 * 10; // 3.2 MB, a OneDrive 320 KB-os egységeinek többszöröse
+const VIEWABLE = ["pdf", "png", "jpg", "jpeg", "gif", "webp", "docx", "doc", "pptx", "ppt", "xlsx", "xls"];
+
+const ICON = {
+  plus: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>',
+  down: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8m0 0L4.8 7.3M8 10.5l3.2-3.2M3 13.5h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
+  eye: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" stroke="currentColor" stroke-width="1.6" fill="none"/><circle cx="8" cy="8" r="2" fill="currentColor"/></svg>',
+  check: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
+  up: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V3m0 0L4.8 6.2M8 3l3.2 3.2M3 13.5h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
+  trash: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
+};
+
+/* ---------- state ---------- */
+const LS = {
+  get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (_) {} },
+  del(k) { try { localStorage.removeItem(k); } catch (_) {} },
+};
+const state = {
+  token: LS.get("hollo_token"), name: LS.get("hollo_name") || "", role: LS.get("hollo_role") || "",
+  route: "", events: new Map(), loaded: false, error: null,
+  connected: null, missingConfig: false, account: "", folderUrl: "", root: "Holló Archívum",
+  month: null, listFilter: "upcoming", statusFilter: 0, selDay: null,
+  openId: null, openSig: null, rejecting: null, confirmDelete: false, confirmFile: null, revertOpen: false,
+  missing: {}, busy: {}, upload: null, archQ: "", archCity: "",
+};
+const isKoord = () => state.role === "koord";
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const pad = n => String(n).padStart(2, "0");
+const isoOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const todayIso = () => isoOf(new Date());
+const parseIso = s => { const [y, m, d] = (s || "").split("-").map(Number); return new Date(y, (m || 1) - 1, d || 1); };
+const fmtMonth = (y, m) => new Intl.DateTimeFormat("hu-HU", { year: "numeric", month: "long" }).format(new Date(y, m, 1));
+const fmtMonthOnly = (y, m) => new Intl.DateTimeFormat("hu-HU", { month: "long" }).format(new Date(y, m, 1));
+const fmtShortMon = d => new Intl.DateTimeFormat("hu-HU", { month: "short" }).format(d).replace(".", "");
+const fmtLong = s => s ? new Intl.DateTimeFormat("hu-HU", { year: "numeric", month: "long", day: "numeric", weekday: "long" }).format(parseIso(s)) : "";
+const fmtDay = s => s ? new Intl.DateTimeFormat("hu-HU", { month: "short", day: "numeric" }).format(parseIso(s)) : "";
+const fmtStamp = ms => ms ? new Intl.DateTimeFormat("hu-HU", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(ms)) : "";
+const fmtSize = b => b > 1048576 ? (b / 1048576).toFixed(1).replace(".", ",") + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
+const extOf = name => { const m = /\.([A-Za-z0-9]{1,8})$/.exec(String(name || "")); return m ? m[1].toLowerCase() : ""; };
+const statusOf = ev => Math.min(5, Math.max(1, Number(ev.status) || 1));
+const latest = (ev, kind) => { const a = ev.files?.[kind] || []; return a.length ? a[a.length - 1] : null; };
+function stepsMini(s) { let h = ""; for (let i = 1; i <= 5; i++) h += `<i class="${i <= s ? "on" : ""}"></i>`; return `<span class="steps-mini" aria-hidden="true">${h}</span>`; }
+function pill(s) { return `<span class="pill st-${s}">${esc(STATUS[s])}</span>`; }
+function cityEvents(cid) { return [...state.events.values()].filter(e => e.city === cid); }
+function sortAsc(a, b) { return (a.date || "").localeCompare(b.date || "") || (a.time || "").localeCompare(b.time || "") || (a.title || "").localeCompare(b.title || "", "hu"); }
+function toast(msg, err) {
+  const t = document.createElement("div");
+  t.className = "toast" + (err ? " err" : "");
+  t.textContent = msg;
+  $("#toasts").appendChild(t);
+  setTimeout(() => t.remove(), err ? 6500 : 3800);
+}
+
+/* ---------- API ---------- */
+async function api(path, opts = {}) {
+  const headers = Object.assign({}, opts.headers || {});
+  if (state.token) headers.Authorization = "Bearer " + state.token;
+  if (opts.json !== undefined) headers["Content-Type"] = "application/json";
+  let res;
+  try { res = await fetch("/api/" + path, { method: opts.method || "GET", headers, body: opts.json !== undefined ? JSON.stringify(opts.json) : undefined }); }
+  catch (_) { throw { code: "network", message: "Nincs kapcsolat a szerverrel. Ellenőrizd az internetet." }; }
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && path !== "login") { logout(true); throw { code: "auth", message: "Lejárt a belépés, lépj be újra." }; }
+  if (!res.ok) throw { code: data.error || "server", message: data.message || "Hiba történt, próbáld újra.", status: res.status };
+  return data;
+}
+function applyEvents(list) {
+  if (!Array.isArray(list)) return;
+  state.events = new Map(list.map(e => [e.id, e]));
+}
+async function refresh(quiet) {
+  if (!state.token) return;
+  try {
+    const d = await api("state");
+    state.connected = d.connected; state.missingConfig = d.missingConfig; state.account = d.account || ""; state.folderUrl = d.folderUrl || ""; state.root = d.root || state.root;
+    state.role = d.role; state.name = d.name; LS.set("hollo_role", d.role);
+    if (d.connected) applyEvents(d.events || []);
+    state.loaded = true; state.error = null;
+  } catch (e) {
+    if (e.code === "auth") return;
+    state.error = e.message;
+    if (!quiet) toast(e.message, true);
+  }
+  renderAll();
+}
+async function act(promise, okMsg) {
+  try {
+    const d = await promise;
+    if (d && d.events) applyEvents(d.events);
+    if (okMsg) toast(okMsg);
+    renderAll();
+    return d;
+  } catch (e) {
+    if (e.code === "not_connected") { state.connected = false; renderAll(); }
+    toast(e.message || "Hiba történt.", true);
+    throw e;
+  }
+}
+function logout(expired) {
+  state.token = null; state.role = ""; LS.del("hollo_token"); LS.del("hollo_role");
+  state.events = new Map(); state.loaded = false; state.openId = null;
+  closeForm(); renderAll();
+  if (expired) toast("Lejárt a belépés, lépj be újra.", true);
+}
+
+/* ---------- routing ---------- */
+function readRoute() {
+  const h = decodeURIComponent(location.hash.replace(/^#/, ""));
+  state.route = (CITY[h] || h === "archivum") ? h : "";
+}
+function go(to) { location.hash = to || ""; readRoute(); state.selDay = null; state.statusFilter = 0; renderAll(); window.scrollTo(0, 0); }
+window.addEventListener("hashchange", () => { readRoute(); state.selDay = null; renderAll(); });
+
+/* ---------- rendering ---------- */
+function renderNav() {
+  const r = state.route;
+  const show = state.token && state.connected;
+  $("#nav").innerHTML = show ? CITIES.map(c => `<button data-act="route" data-to="${c.id}" ${r === c.id ? 'aria-current="page"' : ""}>${esc(c.name)}</button>`).join("")
+    + `<span class="sep" aria-hidden="true"></span><button data-act="route" data-to="archivum" ${r === "archivum" ? 'aria-current="page"' : ""}>Archívum</button>` : "";
+  $("#userchip").innerHTML = state.token ? `<span><b>${esc(state.name)}</b> · ${isKoord() ? "koordinátor" : "szervező"}</span><button class="btn small ghost" data-act="logout">Kilépés</button>` : "";
+}
+function renderAll() {
+  renderNav();
+  const main = $("#main");
+  const a = document.activeElement;
+  const keepId = a && a.id && main.contains(a) ? a.id : null;
+  const sel = keepId && a.selectionStart != null ? [a.selectionStart, a.selectionEnd] : null;
+  if (!state.token) main.innerHTML = loginHTML();
+  else if (state.connected === null) main.innerHTML = `<div class="wrap gate"><div class="card"><p>Betöltés…</p></div></div>`;
+  else if (!state.connected) main.innerHTML = setupHTML();
+  else if (!state.route) main.innerHTML = landingHTML();
+  else if (state.route === "archivum") main.innerHTML = archiveHTML();
+  else main.innerHTML = cityHTML(state.route);
+  if (keepId) { const el = document.getElementById(keepId); if (el) { el.focus(); if (sel && el.setSelectionRange) try { el.setSelectionRange(sel[0], sel[1]); } catch (_) {} } }
+  renderDetail();
+}
+
+function loginHTML() {
+  return `<div class="wrap gate"><form class="card" id="login-form" novalidate>
+    <h1>Belépés</h1>
+    <p>A Holló kollégiumi eseménytere. A jelszót a koordinátortól kapod.</p>
+    <label class="f" for="l-name">A neved<input type="text" id="l-name" autocomplete="name" maxlength="60" value="${esc(state.name)}" placeholder="Így jelensz meg az előzményekben"></label>
+    <label class="f" for="l-pw">Jelszó<input type="password" id="l-pw" autocomplete="current-password" style="width:100%;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 11px;font-size:15px;color:var(--ink)"></label>
+    <div id="l-err" class="banner err" hidden></div>
+    <button class="btn primary" type="submit" id="l-btn">Belépés</button>
+  </form></div>`;
+}
+function setupHTML() {
+  if (!isKoord()) return `<div class="wrap gate"><div class="card"><h1>Még nincs kész</h1><p>A felület még nincs összekötve a OneDrive-val. Szólj a koordinátornak, hogy kapcsolja össze, utána itt minden működni fog.</p><button class="btn" data-act="reload">Újra próbálom</button></div></div>`;
+  return `<div class="wrap gate"><div class="card">
+    <h1>OneDrive összekapcsolása</h1>
+    <p>Utolsó lépés: jelentkezz be azzal a Microsoft-fiókkal, amelyiknek a OneDrive-jába a Holló mentsen. A mentés helye: <b>${esc(state.root)}</b> mappa.</p>
+    ${state.missingConfig ? `<div class="banner err">Előbb add meg a Netlify környezeti változói között az <b>MS_CLIENT_ID</b> és <b>MS_CLIENT_SECRET</b> értékét, majd telepítsd újra az oldalt (útmutató 4. lépés).</div>` : ""}
+    <button class="btn primary" data-act="connect" ${state.missingConfig ? "disabled" : ""}>Bejelentkezés Microsofttal</button>
+    <p style="font-size:13px">A jelszavadat a Microsoft kéri be, a Holló nem látja és nem tárolja.</p>
+  </div></div>`;
+}
+function errBanner() { return state.error ? `<div class="banner err" style="margin-bottom:16px">${esc(state.error)}</div>` : ""; }
+
+function landingHTML() {
+  const t = todayIso();
+  const cards = CITIES.map(c => {
+    const evs = cityEvents(c.id);
+    const up = evs.filter(e => (e.date || "") >= t).sort(sortAsc);
+    const counts = [0, 0, 0, 0, 0, 0];
+    up.forEach(e => counts[statusOf(e)]++);
+    const bar = up.length ? [1, 2, 3, 4, 5].filter(s => counts[s]).map(s => `<i class="st-${s}" style="width:${(counts[s] / up.length * 100).toFixed(2)}%"></i>`).join("") : "";
+    const nx = up[0];
+    return `<button class="city-card" data-act="route" data-to="${c.id}">
+      <h2>${esc(c.name)}</h2>
+      <div class="count num">${up.length} közelgő · ${evs.length} összesen</div>
+      <div class="stack" role="img" aria-label="Közelgő események állapot szerint">${bar}</div>
+      <div class="next">${nx ? `<span class="muted">Következő: ${esc(fmtDay(nx.date))}</span><b>${esc(nx.title)}</b>` : `<span class="muted">Nincs közelgő esemény</span>`}</div>
+    </button>`;
+  }).join("");
+  const total = state.events.size;
+  const files = [...state.events.values()].reduce((n, e) => n + (e.files?.onepager?.length || 0) + (e.files?.komm?.length || 0), 0);
+  return `<section class="wrap land">
+    ${errBanner()}
+    <h1>Kollégiumi események,<br>városonként.</h1>
+    <p class="lede">Válaszd ki a várost: ott látod a naptárat és a listát, felveheted az új eseményt, és végigviheted a one-pagertől a kommunikációs tervig. Minden automatikusan a OneDrive-ba mentődik.</p>
+    <div class="cities">${cards}
+      <button class="city-card arch" data-act="route" data-to="archivum">
+        <h2>Archívum</h2>
+        <div class="count num">${total} esemény · ${files} feltöltött fájl</div>
+        <div class="next">Minden város, évre és hónapra rendezve, a OneDrive-ban is.</div>
+      </button>
+    </div>
+    <div class="legend" aria-label="Állapotok">${[1, 2, 3, 4, 5].map(s => `<span class="st-${s}"><em>${s}.</em> ${esc(STATUS[s])}</span>`).join("")}</div>
+  </section>`;
+}
+
+function cityHTML(cid) {
+  const c = CITY[cid];
+  const evs = cityEvents(cid);
+  const t = todayIso();
+  if (!state.month) { const d = new Date(); state.month = { y: d.getFullYear(), m: d.getMonth() }; }
+  const up = evs.filter(e => (e.date || "") >= t);
+  const counts = [0, 0, 0, 0, 0, 0];
+  up.forEach(e => counts[statusOf(e)]++);
+  const chips = [1, 2, 3, 4, 5].map(s => `<button class="chip st-${s}" data-act="sf" data-s="${s}" aria-pressed="${state.statusFilter === s}"><span class="dot"></span>${esc(STEP_SHORT[s])} <b>${counts[s]}</b></button>`).join("");
+  return `<section class="wrap">
+    <div class="hero">
+      <h1>${esc(c.name)}</h1>
+      <div class="meta">
+        <p class="num">${up.length} közelgő esemény · ${evs.length} összesen</p>
+        <div class="chips" aria-label="Közelgő események állapot szerint (szűrő)">${chips}</div>
+      </div>
+      <div class="actions"><button class="btn primary" data-act="new">${ICON.plus}Új esemény</button></div>
+    </div>
+    ${errBanner()}
+    <div class="city-grid">
+      <section class="panel" aria-label="Naptár">${calendarHTML(evs)}</section>
+      <section class="panel" aria-label="Eseménylista">${listHTML(evs)}</section>
+    </div>
+  </section>`;
+}
+
+function calendarHTML(evs) {
+  const { y, m } = state.month;
+  const first = new Date(y, m, 1);
+  const off = (first.getDay() + 6) % 7;
+  const dim = new Date(y, m + 1, 0).getDate();
+  const cells = Math.ceil((off + dim) / 7) * 7;
+  const byDate = {};
+  evs.forEach(e => { (byDate[e.date] = byDate[e.date] || []).push(e); });
+  const t = todayIso();
+  let h = ["H", "K", "Sze", "Cs", "P", "Szo", "V"].map(d => `<div class="dow">${d}</div>`).join("");
+  for (let i = 0; i < cells; i++) {
+    const d = new Date(y, m, 1 - off + i);
+    const iso = isoOf(d);
+    const list = (byDate[iso] || []).sort(sortAsc);
+    const cls = ["day", d.getMonth() !== m ? "out" : "", iso === t ? "today" : "", state.selDay === iso ? "sel" : ""].join(" ");
+    const shown = list.slice(0, 3).map(e => `<button class="ev-chip st-${statusOf(e)}" data-act="open" data-id="${esc(e.id)}" title="${esc(e.title)} – ${esc(STATUS[statusOf(e)])}">${e.time ? `<span class="t">${esc(e.time)}</span>` : ""}${esc(e.title)}</button>`).join("");
+    const more = list.length > 3 ? `<button class="more" data-act="day" data-d="${iso}">+${list.length - 3} további</button>` : "";
+    h += `<div class="${cls}">
+      <button class="dnum" data-act="day" data-d="${iso}" aria-label="${esc(fmtLong(iso))}, ${list.length} esemény">${d.getDate()}</button>
+      <button class="add" data-act="new" data-date="${iso}" aria-label="Új esemény: ${esc(fmtLong(iso))}">+</button>
+      ${shown}${more}
+    </div>`;
+  }
+  return `<div class="panel-head">
+      <h2>${esc(fmtMonth(y, m))}</h2><span class="grow"></span>
+      <button class="btn small" data-act="month" data-d="0">Ma</button>
+      <button class="btn small" data-act="month" data-d="-1" aria-label="Előző hónap">‹</button>
+      <button class="btn small" data-act="month" data-d="1" aria-label="Következő hónap">›</button>
+    </div>
+    <div class="cal">${h}</div>`;
+}
+
+function listHTML(evs) {
+  const t = todayIso();
+  let list;
+  if (state.selDay) list = evs.filter(e => e.date === state.selDay).sort(sortAsc);
+  else if (state.listFilter === "upcoming") list = evs.filter(e => (e.date || "") >= t).sort(sortAsc);
+  else if (state.listFilter === "past") list = evs.filter(e => (e.date || "") < t).sort((a, b) => sortAsc(b, a));
+  else list = evs.slice().sort(sortAsc);
+  if (state.statusFilter) list = list.filter(e => statusOf(e) === state.statusFilter);
+  const seg = [["upcoming", "Közelgő"], ["past", "Korábbi"], ["all", "Összes"]].map(([k, l]) => `<button data-act="lf" data-f="${k}" aria-pressed="${!state.selDay && state.listFilter === k}">${l}</button>`).join("");
+  const rows = list.map(e => {
+    const s = statusOf(e), d = parseIso(e.date);
+    return `<button class="row st-${s}" data-act="open" data-id="${esc(e.id)}">
+      <div class="datebox"><b>${d.getDate()}</b><span>${esc(fmtShortMon(d))}</span></div>
+      <div>
+        <h3>${esc(e.title)}</h3>
+        <div class="sub"><span>Főszervező: ${esc(e.organizer || "–")}</span>${e.time ? `<span class="num">${esc(e.time)}</span>` : ""}${e.location ? `<span>${esc(e.location)}</span>` : ""}</div>
+        <div class="foot">${pill(s)}${stepsMini(s)}</div>
+      </div>
+    </button>`;
+  }).join("");
+  let empty = "";
+  if (!list.length) empty = `<div class="empty"><b>${state.selDay ? "Ezen a napon nincs esemény" : state.statusFilter ? "Ebben az állapotban nincs esemény" : state.listFilter === "past" ? "Még nincs korábbi esemény" : "Nincs közelgő esemény"}</b>Adj hozzá egyet az „Új esemény” gombbal, vagy a naptárban egy napra kattintva.</div>`;
+  const dayBar = state.selDay ? `<div class="dayfilter"><span>${esc(fmtLong(state.selDay))}</span><span style="flex:1"></span><button class="btn small" data-act="new" data-date="${state.selDay}">${ICON.plus}Erre a napra</button><button class="btn small ghost" data-act="clearday">Összes nap</button></div>` : "";
+  const sfBar = state.statusFilter ? `<div class="filterbar"><span class="pill st-${state.statusFilter}">${esc(STATUS[state.statusFilter])}</span><button class="btn small ghost" data-act="sf" data-s="${state.statusFilter}">Szűrő törlése</button></div>` : "";
+  return `<div class="panel-head"><h2>Események</h2><span class="grow"></span><div class="seg" role="group" aria-label="Időszak">${seg}</div></div>
+    ${dayBar}${sfBar}<div class="list">${rows || empty}</div>`;
+}
+
+/* ---------- archive ---------- */
+function archiveHTML() {
+  const all = [...state.events.values()];
+  const q = state.archQ.trim().toLocaleLowerCase("hu");
+  const filtered = all.filter(e => (!state.archCity || e.city === state.archCity) && (!q || [e.title, e.organizer, e.location, CITY[e.city]?.name].join(" ").toLocaleLowerCase("hu").includes(q)));
+  const fileCount = all.reduce((n, e) => n + (e.files?.onepager?.length || 0) + (e.files?.komm?.length || 0), 0);
+  const cityOpts = `<option value="">Minden város</option>` + CITIES.map(c => `<option value="${c.id}" ${state.archCity === c.id ? "selected" : ""}>${esc(c.name)}</option>`).join("");
+  let body = "";
+  CITIES.forEach(c => {
+    const evs = filtered.filter(e => e.city === c.id).sort((a, b) => sortAsc(b, a));
+    if (!evs.length) return;
+    const groups = new Map();
+    evs.forEach(e => { const k = (e.date || "").slice(0, 7); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(e); });
+    let months = "";
+    groups.forEach((list, k) => {
+      const [yy, mm] = k.split("-").map(Number);
+      months += `<div class="arch-month"><h4>${yy}. ${esc(fmtMonthOnly(yy, mm - 1))}</h4>` + list.map(e => {
+        const s = statusOf(e);
+        const fb = kind => { const f = latest(e, kind); return f ? `<button class="btn small" data-act="dl" data-item="${esc(f.itemId)}" title="${esc(f.name)}">${ICON.down}${kind === "onepager" ? "One-pager" : "Komm. terv"}</button>` : ""; };
+        return `<div class="arch-row st-${s}">
+          <span class="mono num">${esc(e.date)}</span>
+          <div><button class="tt" data-act="open" data-id="${esc(e.id)}">${esc(e.title)}</button> <span class="who">· ${esc(e.organizer || "–")}</span><div style="margin-top:3px">${pill(s)}</div></div>
+          <div class="files">${fb("onepager")}${fb("komm")}</div>
+        </div>`;
+      }).join("") + `</div>`;
+    });
+    body += `<div class="arch-city"><h3>${esc(c.name)} <small class="num">${evs.length} esemény</small></h3>${months}</div>`;
+  });
+  if (!body) body = `<div class="empty"><b>${all.length ? "Nincs találat" : "Az archívum még üres"}</b>${all.length ? "Próbálj más keresőszót vagy várost." : "Az események itt jelennek meg, amint valaki felvesz egyet."}</div>`;
+  const root = esc(state.root);
+  return `<section class="wrap">
+    <div class="hero"><h1>Archívum</h1><div class="meta"><p class="num">${all.length} esemény · ${fileCount} feltöltött fájl</p></div></div>
+    ${errBanner()}
+    <div class="arch-grid">
+      <aside class="panel sync" aria-label="OneDrive mentés">
+        <h2>OneDrive</h2>
+        <div class="state">
+          <span class="okline">Automatikus mentés bekapcsolva</span>
+          ${state.account ? `<span class="muted">Fiók: ${esc(state.account)}</span>` : ""}
+          <span class="muted">Mappa: ${root}</span>
+        </div>
+        <p class="muted" style="margin:0;font-size:14px">Minden új esemény, feltöltés, elfogadás és törlés azonnal megjelenik a OneDrive-ban, ebben a szerkezetben:</p>
+        <div class="tree">${root}/
+├─ osszes_esemeny.csv
+├─ Budapest/
+│  ├─ Budapest_esemenyek.csv
+│  └─ 2026/
+│     └─ 2026-11-26_Filmklub/
+│        ├─ esemeny.txt
+│        ├─ OnePager - ….pdf
+│        ├─ Kommunikacios_terv - ….docx
+│        └─ korabbi_verziok/
+├─ Szeged/ …
+└─ _adatok/  (a felület adatai, ne módosítsd)</div>
+        <div class="btns">
+          ${state.folderUrl ? `<a class="btn primary" href="${esc(state.folderUrl)}" target="_blank" rel="noopener">Mappa megnyitása a OneDrive-ban</a>` : ""}
+          <button class="btn" data-act="csv" ${!all.length ? "disabled" : ""}>${ICON.down}Táblázat letöltése (CSV)</button>
+          ${isKoord() ? `<button class="btn small ghost danger" data-act="disconnect">OneDrive leválasztása</button>` : ""}
+        </div>
+      </aside>
+      <section class="panel" aria-label="Archivált események">
+        <div class="arch-search">
+          <input type="search" id="arch-q" placeholder="Keresés: esemény, főszervező, helyszín" value="${esc(state.archQ)}" aria-label="Keresés az archívumban">
+          <select id="arch-city" aria-label="Város" style="width:auto">${cityOpts}</select>
+        </div>
+        ${body}
+      </section>
+    </div>
+  </section>`;
+}
+
+/* ---------- detail modal ---------- */
+function renderDetail(force) {
+  const root = $("#modal-root");
+  if (!state.openId || !state.token) { root.innerHTML = ""; state.openSig = null; return; }
+  const ev = state.events.get(state.openId);
+  if (!ev) { root.innerHTML = ""; state.openId = null; return; }
+  const sig = JSON.stringify([ev.updatedAt, ev.status, ev.title, state.busy[ev.id], state.upload && state.upload.id === ev.id ? Math.round(state.upload.p * 50) : -1, state.rejecting, state.confirmDelete, state.confirmFile, state.revertOpen, state.missing[ev.id]]);
+  if (!force && sig === state.openSig) return;
+  const noteEl = $("#reject-note"); const noteVal = noteEl ? noteEl.value : "";
+  const revNote = $("#revert-note"); const revVal = revNote ? revNote.value : "";
+  state.openSig = sig;
+  const s = statusOf(ev);
+  const steps = [1, 2, 3, 4, 5].map(i => `<div class="step ${i < s ? "done" : i === s ? "cur" : ""}"><div class="n">${i < s ? "✓" : i}</div><span>${esc(STEP_SHORT[i])}</span></div>`).join("");
+  const revertBox = isKoord() && s > 1 ? (state.revertOpen ? `<div class="action st-1"><h3>Állapot visszaállítása</h3>
+      <div class="revert"><label for="revert-to">Vissza erre:</label><select id="revert-to">${[1, 2, 3, 4].filter(i => i < s).map(i => `<option value="${i}">${i}. ${esc(STATUS[i])}</option>`).join("")}</select></div>
+      <label class="f" for="revert-note">Indoklás (megjelenik az előzményekben)<textarea id="revert-note"></textarea></label>
+      <div class="btns"><button class="btn danger solid" data-act="revert-yes">Visszaállítás</button><button class="btn" data-act="revert-no">Mégse</button></div></div>` : "") : "";
+  root.innerHTML = `<div class="scrim" data-act="scrim">
+    <div class="modal st-${s}" role="dialog" aria-modal="true" aria-labelledby="m-title">
+      <div class="m-stripe"></div>
+      <div class="m-head">
+        <div style="flex:1;display:grid;gap:8px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${pill(s)}<span class="muted" style="font-size:13px">${esc(CITY[ev.city]?.name || "")}</span></div>
+          <h2 id="m-title">${esc(ev.title)}</h2>
+        </div>
+        <button class="x" data-act="close" aria-label="Bezárás">×</button>
+      </div>
+      <div class="m-body">
+        <div class="facts">
+          <span>Dátum: <b>${esc(fmtLong(ev.date))}${ev.time ? ", " + esc(ev.time) : ""}</b></span>
+          <span>Főszervező: <b>${esc(ev.organizer || "–")}</b></span>
+          ${ev.location ? `<span>Helyszín: <b>${esc(ev.location)}</b></span>` : ""}
+        </div>
+        ${ev.description ? `<p class="desc">${esc(ev.description)}</p>` : ""}
+        <div class="stepper st-${s}" aria-label="Állapot: ${s}. lépés az 5-ből">${steps}</div>
+        ${actionHTML(ev, s)}
+        ${revertBox}
+        ${docsHTML(ev)}
+        ${histHTML(ev)}
+      </div>
+      <div class="m-foot">
+        ${state.confirmDelete
+          ? `<span style="margin-right:auto;align-self:center;font-size:14px">Biztosan törlöd? Az esemény mappája a OneDrive lomtárába kerül.</span><button class="btn" data-act="del-no">Mégse</button><button class="btn danger solid" data-act="del-yes">Végleges törlés</button>`
+          : `${isKoord() ? `<button class="btn danger ghost" data-act="del">Törlés</button>` : ""}${isKoord() && s > 1 && !state.revertOpen ? `<button class="btn ghost" data-act="revert-open">Állapot visszaállítása</button>` : ""}<span style="flex:1"></span><button class="btn" data-act="edit">Adatok szerkesztése</button>`}
+        <button class="btn" data-act="close">Bezárás</button>
+      </div>
+    </div>
+  </div>`;
+  const ne = $("#reject-note"); if (ne && noteVal) ne.value = noteVal;
+  const rn = $("#revert-note"); if (rn && revVal) rn.value = revVal;
+}
+
+function dropHTML(ev, kind, label) {
+  if (state.upload && state.upload.id === ev.id) {
+    return `<div class="drop"><b>Feltöltés: ${esc(state.upload.name)}</b><div class="progress" style="width:100%"><i style="width:${Math.round(state.upload.p * 100)}%"></i></div><small>${Math.round(state.upload.p * 100)}%</small></div>`;
+  }
+  if (state.busy[ev.id]) return `<div class="drop"><b>Mentés a OneDrive-ba…</b></div>`;
+  return `<label class="drop" data-drop="${kind}">
+    <input type="file" data-upload="${kind}">
+    <span class="btn primary" aria-hidden="true">${ICON.up}${esc(label)}</span>
+    <small>vagy húzd ide a fájlt · bármilyen formátum, max. 250 MB</small>
+  </label>`;
+}
+function fileRow(ev, kind, f, idx, isLatest) {
+  const ext = extOf(f.name);
+  const miss = (state.missing[ev.id] || []).includes(f.itemId);
+  const s = statusOf(ev);
+  const accepted = (kind === "onepager" && s >= 3) || (kind === "komm" && s >= 5);
+  const canDel = !accepted || isKoord();
+  const key = `${kind}:${idx}`;
+  const delUi = !canDel ? "" : state.confirmFile === key
+    ? `<span style="font-size:13px">Törlöd?</span><button class="btn small danger solid" data-act="file-del-yes" data-kind="${kind}" data-i="${idx}">Igen</button><button class="btn small" data-act="file-del-no">Nem</button>`
+    : `<button class="btn small ghost danger" data-act="file-del" data-kind="${kind}" data-i="${idx}" aria-label="${esc(f.name)} törlése">${ICON.trash}</button>`;
+  return `<div class="file ${isLatest ? "" : "old"}">
+    <div class="ic">${esc(ext || "fájl")}</div>
+    <div class="nm"><b>${esc(f.name)}</b><small>${isLatest ? "" : `${idx + 1}. verzió · `}${esc(fmtSize(f.size || 0))} · ${esc(fmtStamp(f.at))} · ${esc(f.by || "")}</small>${miss ? `<div class="tag-missing">Hiányzik a OneDrive-ból</div>` : ""}</div>
+    ${!miss && VIEWABLE.includes(ext) ? `<button class="btn small" data-act="view" data-item="${esc(f.itemId)}">${ICON.eye}Megnyitás</button>` : ""}
+    ${!miss ? `<button class="btn small" data-act="dl" data-item="${esc(f.itemId)}">${ICON.down}Letöltés</button>` : ""}
+    ${delUi}
+  </div>`;
+}
+function actionHTML(ev, s) {
+  const op = latest(ev, "onepager"), km = latest(ev, "komm");
+  const opIdx = (ev.files?.onepager?.length || 1) - 1, kmIdx = (ev.files?.komm?.length || 1) - 1;
+  const rejectBox = kind => state.rejecting === kind ? `<div class="inline-confirm">
+      <label class="f" for="reject-note">Mit kell javítani? (megjelenik az előzményekben)</label>
+      <textarea id="reject-note" placeholder="Pl. hiányzik a költségvetés"></textarea>
+      <div class="btns"><button class="btn danger solid" data-act="reject-yes" data-kind="${kind}">Visszaküldés</button><button class="btn" data-act="reject-no">Mégse</button></div>
+    </div>` : "";
+  const decideBtns = (kind, label) => {
+    if (!isKoord()) return `<p>A koordinátor fogadja el vagy küldi vissza.</p>`;
+    if (state.rejecting === kind) return "";
+    return `<div class="btns"><button class="btn ok" data-act="accept" data-kind="${kind}">${ICON.check}${label} elfogadása</button><button class="btn" data-act="reject" data-kind="${kind}">Visszaküldés javításra</button></div>`;
+  };
+  const newVer = kind => !state.rejecting ? `<details><summary class="muted" style="cursor:pointer;font-size:13.5px">Új verzió feltöltése</summary><div style="margin-top:8px">${dropHTML(ev, kind, "Új verzió feltöltése")}</div></details>` : "";
+  if (s === 1) return `<div class="action st-2"><h3>Következő lépés: one-pager leadása</h3><p>Töltsd fel az esemény one-pagerét. Feltöltés után az esemény „One-pager leadva” állapotba lép.</p>${dropHTML(ev, "onepager", "One-pager feltöltése")}</div>`;
+  if (s === 2) return `<div class="action st-2"><h3>A one-pager elbírálásra vár</h3>
+      ${op ? fileRow(ev, "onepager", op, opIdx, true) : `<p>Nincs feltöltött fájl.</p>`}
+      ${decideBtns("onepager", "One-pager")}${rejectBox("onepager")}${newVer("onepager")}</div>`;
+  if (s === 3) return `<div class="action st-4"><h3>Következő lépés: kommunikációs terv leadása</h3><p>A one-pager elfogadva. Töltsd fel a kommunikációs tervet; utána az esemény „Kommunikációs terv leadva” állapotba lép.</p>${dropHTML(ev, "komm", "Kommunikációs terv feltöltése")}</div>`;
+  if (s === 4) return `<div class="action st-4"><h3>A kommunikációs terv elbírálásra vár</h3>
+      ${km ? fileRow(ev, "komm", km, kmIdx, true) : `<p>Nincs feltöltött fájl.</p>`}
+      ${decideBtns("komm", "Kommunikációs terv")}${rejectBox("komm")}${newVer("komm")}</div>`;
+  return `<div class="action st-5"><div class="ready"><div class="big">${ICON.check}</div><div><h3>Az esemény készen áll</h3><p>A one-pager és a kommunikációs terv is elfogadva.</p></div></div></div>`;
+}
+function docsHTML(ev) {
+  const g = kind => {
+    const arr = ev.files?.[kind] || [];
+    if (!arr.length) return `<div class="group"><h4>${esc(KIND[kind].label)}</h4><span class="muted" style="font-size:14px">Még nincs feltöltve.</span></div>`;
+    return `<div class="group"><h4>${esc(KIND[kind].label)}</h4>${arr.map((f, i) => ({ f, i })).reverse().map(({ f, i }) => fileRow(ev, kind, f, i, i === arr.length - 1)).join("")}</div>`;
+  };
+  return `<div class="docs">${g("onepager")}${g("komm")}</div>`;
+}
+function histHTML(ev) {
+  const h = (ev.history || []).slice().reverse();
+  if (!h.length) return "";
+  return `<div class="hist"><h4>Előzmények</h4><ol>${h.map(x => `<li class="st-${x.status || 1}"><div><div>${esc(x.text || x.type)}${x.status ? ` → <b>${esc(STATUS[x.status])}</b>` : ""}</div><div class="when">${esc(fmtStamp(x.at))} · ${esc(x.by || "")}</div>${x.note ? `<div class="note">${esc(x.note)}</div>` : ""}</div></li>`).join("")}</ol></div>`;
+}
+
+/* ---------- event form ---------- */
+function openForm(ev, presetDate) {
+  const isEdit = !!ev;
+  const cid = ev?.city || (CITY[state.route] ? state.route : "budapest");
+  const opts = CITIES.map(c => `<option value="${c.id}" ${c.id === cid ? "selected" : ""}>${esc(c.name)}</option>`).join("");
+  $("#form-root").innerHTML = `<div class="scrim" data-act="form-scrim">
+    <form class="modal narrow" id="ev-form" role="dialog" aria-modal="true" aria-labelledby="f-title" novalidate>
+      <div class="m-head"><h2 id="f-title">${isEdit ? "Esemény szerkesztése" : "Új esemény"}</h2><button type="button" class="x" data-act="form-close" aria-label="Bezárás">×</button></div>
+      <div class="m-body">
+        <div class="form-grid">
+          <label class="f full" for="f-name">Esemény neve *<input type="text" id="f-name" required maxlength="140" value="${esc(ev?.title || "")}" placeholder="Pl. Kollégiumi filmklub"></label>
+          <label class="f" for="f-date">Dátum *<input type="date" id="f-date" required value="${esc(ev?.date || presetDate || todayIso())}"></label>
+          <label class="f" for="f-time">Időpont<input type="time" id="f-time" value="${esc(ev?.time || "")}"></label>
+          <label class="f" for="f-org">Főszervező neve *<input type="text" id="f-org" required maxlength="80" value="${esc(ev?.organizer || "")}" placeholder="Teljes név"></label>
+          <label class="f" for="f-city">Város<select id="f-city">${opts}</select></label>
+          <label class="f full" for="f-loc">Helyszín<input type="text" id="f-loc" maxlength="140" value="${esc(ev?.location || "")}" placeholder="Pl. Kollégium klubterme"></label>
+          <label class="f full" for="f-desc">Rövid leírás<textarea id="f-desc" maxlength="2000">${esc(ev?.description || "")}</textarea></label>
+        </div>
+        <div id="f-err" class="banner err" hidden></div>
+      </div>
+      <div class="m-foot"><button type="button" class="btn" data-act="form-close">Mégse</button><button type="submit" class="btn primary" id="f-save">${isEdit ? "Mentés" : "Esemény hozzáadása"}</button></div>
+    </form>
+  </div>`;
+  const form = $("#ev-form");
+  form.dataset.id = ev?.id || "";
+  setTimeout(() => $("#f-name").focus(), 30);
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const v = id => $(id).value.trim();
+    const data = { title: v("#f-name"), date: v("#f-date"), time: v("#f-time"), organizer: v("#f-org"), city: v("#f-city"), location: v("#f-loc"), description: v("#f-desc") };
+    const missing = [];
+    if (!data.title) missing.push("esemény neve");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data.date)) missing.push("dátum");
+    if (!data.organizer) missing.push("főszervező neve");
+    if (missing.length) { const er = $("#f-err"); er.hidden = false; er.textContent = "Töltsd ki: " + missing.join(", ") + "."; return; }
+    $("#f-save").disabled = true; $("#f-save").textContent = "Mentés a OneDrive-ba…";
+    try {
+      if (form.dataset.id) await act(api("events/" + form.dataset.id, { method: "PUT", json: data }), "Mentve.");
+      else {
+        await act(api("events", { method: "POST", json: data }), "Esemény hozzáadva.");
+        if (state.route !== data.city) location.hash = data.city;
+        const d = parseIso(data.date); state.month = { y: d.getFullYear(), m: d.getMonth() }; renderAll();
+      }
+      closeForm();
+    } catch (_) { const b = $("#f-save"); if (b) { b.disabled = false; b.textContent = form.dataset.id ? "Mentés" : "Esemény hozzáadása"; } }
+  });
+}
+function closeForm() { $("#form-root").innerHTML = ""; }
+
+/* ---------- files ---------- */
+async function handleUpload(file, kind) {
+  const id = state.openId;
+  if (!id || !file || state.upload) return;
+  if (file.size > MAX_FILE) { toast("A fájl túl nagy (legfeljebb 250 MB).", true); return; }
+  if (!file.size) { toast("Üres fájlt nem lehet feltölteni.", true); return; }
+  state.upload = { id, name: file.name, p: 0 }; renderDetail(true);
+  try {
+    const { uploadUrl } = await api(`events/${id}/upload-start`, { method: "POST", json: { kind, name: file.name, size: file.size } });
+    let item = null;
+    for (let start = 0; start < file.size; start += CHUNK) {
+      const end = Math.min(start + CHUNK, file.size);
+      let res, tries = 0;
+      while (true) {
+        try {
+          res = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Range": `bytes ${start}-${end - 1}/${file.size}` }, body: file.slice(start, end) });
+          if (res.ok || tries >= 3 || (res.status < 500 && res.status !== 429)) break;
+        } catch (_) { if (tries >= 3) throw { message: "Megszakadt a feltöltés. Próbáld újra." }; }
+        tries++; await new Promise(r => setTimeout(r, 1000 * tries));
+      }
+      if (!res.ok) throw { message: "A OneDrive nem fogadta el a fájlt. Próbáld újra." };
+      if (res.status === 200 || res.status === 201) item = await res.json();
+      state.upload.p = end / file.size; renderDetail();
+    }
+    if (!item || !item.id) throw { message: "A feltöltés nem fejeződött be. Próbáld újra." };
+    state.upload = null; state.busy[id] = true; renderDetail(true);
+    await act(api(`events/${id}/upload-done`, { method: "POST", json: { kind, itemId: item.id, name: file.name, size: file.size } }), `${KIND[kind].label} feltöltve.`);
+  } catch (e) {
+    if (e && e.message && !e.code) toast(e.message, true);
+  } finally {
+    state.upload = null; delete state.busy[id]; renderDetail(true);
+  }
+}
+async function openFile(itemId, mode) {
+  // a böngésző csak kattintásra enged új lapot, ezért előre megnyitjuk
+  const w = mode === "view" ? window.open("about:blank", "_blank") : null;
+  try {
+    const d = await api(`file?id=${encodeURIComponent(itemId)}&mode=${mode}`);
+    if (mode === "view") { if (w) w.location.href = d.url; else window.location.href = d.url; }
+    else { const a = document.createElement("a"); a.href = d.url; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove(); }
+  } catch (e) { if (w) w.close(); toast(e.message || "Nem sikerült megnyitni a fájlt.", true); if (state.openId) checkMissing(state.openId); }
+}
+async function checkMissing(id) {
+  try { const d = await api(`events/${id}/check`); state.missing[id] = d.missing || []; renderDetail(); } catch (_) {}
+}
+function exportCsv() {
+  const all = [...state.events.values()].sort((a, b) => (a.city || "").localeCompare(b.city || "") || sortAsc(a, b));
+  const q = v => { const s = String(v ?? ""); return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const head = ["Város", "Dátum", "Időpont", "Esemény", "Főszervező", "Helyszín", "Állapot", "One-pager", "Kommunikációs terv"];
+  const rows = all.map(e => [CITY[e.city]?.name, e.date, e.time, e.title, e.organizer, e.location, `${statusOf(e)}. ${STATUS[statusOf(e)]}`, latest(e, "onepager")?.name, latest(e, "komm")?.name].map(q).join(";"));
+  const blob = new Blob(["﻿" + [head.join(";")].concat(rows).join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `Hollo_esemenyek_${todayIso()}.csv`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+/* ---------- events ---------- */
+function openEvent(id) {
+  state.openId = id; state.rejecting = null; state.confirmDelete = false; state.confirmFile = null; state.revertOpen = false;
+  renderDetail(true); checkMissing(id);
+}
+function closeEvent() { state.openId = null; state.rejecting = null; state.confirmDelete = false; state.confirmFile = null; state.revertOpen = false; renderDetail(); }
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-act]");
+  if (!t) return;
+  const a = t.dataset.act;
+  if ((a === "scrim" || a === "form-scrim") && e.target !== t) return;
+  const id = state.openId;
+  switch (a) {
+    case "route": go(t.dataset.to); break;
+    case "logout": logout(); break;
+    case "reload": refresh(); break;
+    case "connect": api("ms-connect", { method: "POST" }).then(d => { window.location.href = d.url; }).catch(err => toast(err.message, true)); break;
+    case "disconnect": if (t.dataset.sure) api("ms-disconnect", { method: "POST" }).then(() => { state.connected = false; renderAll(); }).catch(err => toast(err.message, true)); else { t.dataset.sure = "1"; t.textContent = "Biztosan leválasztod? Kattints újra."; } break;
+    case "new": openForm(null, t.dataset.date); break;
+    case "open": openEvent(t.dataset.id); break;
+    case "close": case "scrim": closeEvent(); break;
+    case "form-close": case "form-scrim": closeForm(); break;
+    case "month": {
+      const d = Number(t.dataset.d);
+      if (d === 0) { const n = new Date(); state.month = { y: n.getFullYear(), m: n.getMonth() }; }
+      else { const n = new Date(state.month.y, state.month.m + d, 1); state.month = { y: n.getFullYear(), m: n.getMonth() }; }
+      renderAll(); break;
+    }
+    case "day": state.selDay = state.selDay === t.dataset.d ? null : t.dataset.d; renderAll(); break;
+    case "clearday": state.selDay = null; renderAll(); break;
+    case "lf": state.selDay = null; state.listFilter = t.dataset.f; renderAll(); break;
+    case "sf": { const s = Number(t.dataset.s); state.statusFilter = state.statusFilter === s ? 0 : s; renderAll(); break; }
+    case "edit": { const ev = state.events.get(id); if (ev) openForm(ev); break; }
+    case "del": state.confirmDelete = true; renderDetail(true); break;
+    case "del-no": state.confirmDelete = false; renderDetail(true); break;
+    case "del-yes": t.disabled = true; act(api("events/" + id, { method: "DELETE" }), "Esemény törölve.").then(closeEvent).catch(() => { t.disabled = false; }); break;
+    case "accept": t.disabled = true; act(api(`events/${id}/decide`, { method: "POST", json: { kind: t.dataset.kind, accept: true } }), `${KIND[t.dataset.kind].label} elfogadva.`).catch(() => renderDetail(true)); break;
+    case "reject": state.rejecting = t.dataset.kind; renderDetail(true); setTimeout(() => $("#reject-note")?.focus(), 20); break;
+    case "reject-no": state.rejecting = null; renderDetail(true); break;
+    case "reject-yes": t.disabled = true; act(api(`events/${id}/decide`, { method: "POST", json: { kind: t.dataset.kind, accept: false, note: $("#reject-note")?.value || "" } }), "Visszaküldve javításra.").then(() => { state.rejecting = null; renderDetail(true); }).catch(() => renderDetail(true)); break;
+    case "revert-open": state.revertOpen = true; renderDetail(true); break;
+    case "revert-no": state.revertOpen = false; renderDetail(true); break;
+    case "revert-yes": t.disabled = true; act(api(`events/${id}/revert`, { method: "POST", json: { to: Number($("#revert-to").value), note: $("#revert-note")?.value || "" } }), "Állapot visszaállítva.").then(() => { state.revertOpen = false; renderDetail(true); }).catch(() => renderDetail(true)); break;
+    case "file-del": state.confirmFile = `${t.dataset.kind}:${t.dataset.i}`; renderDetail(true); break;
+    case "file-del-no": state.confirmFile = null; renderDetail(true); break;
+    case "file-del-yes": t.disabled = true; act(api(`events/${id}/files/${t.dataset.kind}/${t.dataset.i}`, { method: "DELETE" }), "Fájl törölve (a OneDrive lomtárában még 30 napig visszaállítható).").then(() => { state.confirmFile = null; renderDetail(true); }).catch(() => { state.confirmFile = null; renderDetail(true); }); break;
+    case "dl": openFile(t.dataset.item, "download"); break;
+    case "view": openFile(t.dataset.item, "view"); break;
+    case "csv": exportCsv(); break;
+  }
+});
+document.addEventListener("submit", async e => {
+  if (e.target.id !== "login-form") return;
+  e.preventDefault();
+  const name = $("#l-name").value.trim(), pw = $("#l-pw").value;
+  const er = $("#l-err");
+  if (!name) { er.hidden = false; er.textContent = "Írd be a neved."; return; }
+  $("#l-btn").disabled = true;
+  try {
+    const d = await api("login", { method: "POST", json: { name, password: pw } });
+    state.token = d.token; state.name = d.name; state.role = d.role;
+    LS.set("hollo_token", d.token); LS.set("hollo_name", d.name); LS.set("hollo_role", d.role);
+    state.connected = null; renderAll(); refresh();
+  } catch (err) {
+    er.hidden = false;
+    er.textContent = err.code === "bad_password" ? "Hibás jelszó." : err.code === "no_password_set" ? "A jelszó még nincs beállítva a Netlify-on (útmutató 4. lépés)." : (err.message || "Nem sikerült belépni.");
+    $("#l-btn").disabled = false;
+  }
+});
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  if ($("#form-root").innerHTML) { closeForm(); return; }
+  if (state.openId) closeEvent();
+});
+document.addEventListener("change", e => {
+  const inp = e.target;
+  if (inp.matches && inp.matches("input[data-upload]") && inp.files && inp.files[0]) handleUpload(inp.files[0], inp.dataset.upload);
+  if (inp.id === "arch-city") { state.archCity = inp.value; renderAll(); }
+});
+document.addEventListener("input", e => { if (e.target.id === "arch-q") { state.archQ = e.target.value; renderAll(); } });
+["dragenter", "dragover"].forEach(n => document.addEventListener(n, e => { const z = e.target.closest && e.target.closest("[data-drop]"); if (z) { e.preventDefault(); z.classList.add("over"); } }));
+document.addEventListener("dragleave", e => { const z = e.target.closest && e.target.closest("[data-drop]"); if (z) z.classList.remove("over"); });
+document.addEventListener("drop", e => {
+  const z = e.target.closest && e.target.closest("[data-drop]");
+  if (!z) return;
+  e.preventDefault(); z.classList.remove("over");
+  const f = e.dataTransfer?.files?.[0]; if (f) handleUpload(f, z.dataset.drop);
+});
+
+/* ---------- boot & live refresh ---------- */
+readRoute();
+renderAll();
+if (state.token) refresh();
+setInterval(() => {
+  if (document.visibilityState === "visible" && state.token && state.connected && !state.upload && !$("#form-root").innerHTML) refresh(true);
+}, 60000);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && state.token) refresh(true); });
+</script>
+</body>
+</html>
